@@ -47,7 +47,21 @@ public interface TransactionMapper {
   @Mapping(target = "operationIdentifier", source = "index", qualifiedByName = "OperationIdentifier")
   Operation mapPoolRetirementToOperation(PoolRetirement model, OperationStatus status, int index);
 
-  StakePoolDelegation mapDelegationEntityToDelegation(DelegationEntity entity);
+  @Mapping(source = "txHash", target = "txHash")
+  @Mapping(source = "certIndex", target = "certIndex")
+  @Mapping(source = "address", target = "address")
+  @Mapping(source = "drepHash", target = "drep.drepId") // no this is not a mistake we don't have bech32 representation in rosetta
+  @Mapping(source = "drepType", target = "drep.drepType", qualifiedByName = "convertYaciDrepType")
+  DRepDelegation mapEntityToDRepDelegation(DrepVoteDelegationEntity entity);
+
+  @Mapping(source = "txHash", target = "txHash")
+  @Mapping(source = "certIndex", target = "certIndex")
+  @Mapping(source = "address", target = "address")
+  @Mapping(source = "drep.drepId", target = "drepHash") // no this is not a mistake we don't have bech32 representation in rosetta
+  @Mapping(source = "drep.drepType", target = "drepType", qualifiedByName = "convertClientDrepType")
+  DrepVoteDelegationEntity mapDRepDelegationToEntity(DRepDelegation dRepDelegation);
+
+  StakePoolDelegation mapPoolDelegationEntityToDelegation(PoolDelegationEntity entity);
 
   @Mapping(target = "status", source = "status.status")
   @Mapping(target = "type", constant = Constants.OPERATION_TYPE_STAKE_DELEGATION)
@@ -55,6 +69,50 @@ public interface TransactionMapper {
   @Mapping(target = "account.address", source = "model.address")
   @Mapping(target = "metadata.poolKeyHash", source = "model.poolId")
   Operation mapStakeDelegationToOperation(StakePoolDelegation model, OperationStatus status, int index);
+
+  default DRepDelegation mapDrepVoteDelegationEntityToDRepDelegation(DrepVoteDelegationEntity entity) {
+    if (entity == null) {
+      return null;
+    }
+
+    return DRepDelegation.builder()
+            .txHash(entity.getTxHash())
+            .certIndex(entity.getCertIndex())
+            .address(entity.getAddress())
+            .drep(new DRepDelegation.DRep(
+                    entity.getDrepHash(),
+                    convertYaciDrepType(entity.getDrepType())
+            ))
+            .build();
+  }
+
+  @Named("convertYaciDrepType")
+  default com.bloxbean.cardano.client.transaction.spec.governance.DRepType convertYaciDrepType(
+      com.bloxbean.cardano.yaci.core.model.governance.DrepType yaciDrepType) {
+    if (yaciDrepType == null) {
+      return null;
+    }
+    return switch (yaciDrepType) {
+      case ADDR_KEYHASH -> com.bloxbean.cardano.client.transaction.spec.governance.DRepType.ADDR_KEYHASH;
+      case SCRIPTHASH -> com.bloxbean.cardano.client.transaction.spec.governance.DRepType.SCRIPTHASH;
+      case ABSTAIN -> com.bloxbean.cardano.client.transaction.spec.governance.DRepType.ABSTAIN;
+      case NO_CONFIDENCE -> com.bloxbean.cardano.client.transaction.spec.governance.DRepType.NO_CONFIDENCE;
+    };
+  }
+
+  @Named("convertClientDrepType")
+  default com.bloxbean.cardano.yaci.core.model.governance.DrepType convertClientDrepType(
+      com.bloxbean.cardano.client.transaction.spec.governance.DRepType clientDrepType) {
+    if (clientDrepType == null) {
+      return null;
+    }
+    return switch (clientDrepType) {
+      case ADDR_KEYHASH -> com.bloxbean.cardano.yaci.core.model.governance.DrepType.ADDR_KEYHASH;
+      case SCRIPTHASH -> com.bloxbean.cardano.yaci.core.model.governance.DrepType.SCRIPTHASH;
+      case ABSTAIN -> com.bloxbean.cardano.yaci.core.model.governance.DrepType.ABSTAIN;
+      case NO_CONFIDENCE -> com.bloxbean.cardano.yaci.core.model.governance.DrepType.NO_CONFIDENCE;
+    };
+  }
 
   @Mapping(target = "status", source = "status.status")
   @Mapping(target = "type", constant = Constants.OPERATION_TYPE_DREP_VOTE_DELEGATION)
